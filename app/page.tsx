@@ -57,13 +57,12 @@ export default function Home() {
     await supabase.from('profiles').upsert({ id: userData.user.id, bg_url: url });
   };
 
-  // 1 & 2. 로그인 함수 (성공 알림 및 Enter 대응)
   const signIn = async () => {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) {
       alert(error.message);
     } else {
-      alert('로그인 성공!'); // 로그인 성공 창 띄우기
+      alert('로그인 성공!');
       setIsLoggedIn(true);
       loadProfile();
       loadTodos();
@@ -78,6 +77,20 @@ export default function Home() {
     if (todoData) setTodos(todoData);
   };
 
+  // ✅ 추가된 기능: 투두 완료 토글 함수
+  const toggleTodo = async (id: string, currentStatus: boolean) => {
+    const { error } = await supabase
+      .from('todos')
+      .update({ is_done: !currentStatus })
+      .eq('id', id);
+    
+    if (error) {
+      alert('상태 업데이트 실패');
+    } else {
+      loadTodos(); // 목록 새로고침
+    }
+  };
+
   const loadDailyNote = async () => {
     const { data: userData } = await supabase.auth.getUser();
     if (!userData.user) return;
@@ -86,28 +99,18 @@ export default function Home() {
     setDev(note?.dev ?? '');
   };
 
-  // 3. 개별 저장 함수 (독서)
   const saveReading = async () => {
     const { data: userData } = await supabase.auth.getUser();
     if (!userData.user) return;
-    await supabase.from('daily_notes').upsert({ 
-      user_id: userData.user.id, 
-      date: selectedDate, 
-      reading: reading 
-    });
-    alert('독서 기록이 저장되었습니다.');
+    await supabase.from('daily_notes').upsert({ user_id: userData.user.id, date: selectedDate, reading: reading });
+    alert('독서 기록 저장 완료');
   };
 
-  // 3. 개별 저장 함수 (개발)
   const saveDev = async () => {
     const { data: userData } = await supabase.auth.getUser();
     if (!userData.user) return;
-    await supabase.from('daily_notes').upsert({ 
-      user_id: userData.user.id, 
-      date: selectedDate, 
-      dev: dev 
-    });
-    alert('개발 기록이 저장되었습니다.');
+    await supabase.from('daily_notes').upsert({ user_id: userData.user.id, date: selectedDate, dev: dev });
+    alert('개발 기록 저장 완료');
   };
 
   useEffect(() => {
@@ -128,28 +131,18 @@ export default function Home() {
         <div className="max-w-md mx-auto bg-white/80 backdrop-blur p-6 rounded shadow space-y-3">
           <h1 className="text-xl font-bold text-center">나의 기록장</h1>
           <input className="w-full border p-2" placeholder="이메일" value={email} onChange={(e) => setEmail(e.target.value)} />
-          <input 
-            ref={passwordRef} 
-            className="w-full border p-2" 
-            placeholder="비밀번호" 
-            type="password" 
-            value={password} 
-            onChange={(e) => setPassword(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && signIn()} // 1. Enter키 대응
-          />
+          <input ref={passwordRef} className="w-full border p-2" placeholder="비밀번호" type="password" value={password} onChange={(e) => setPassword(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && signIn()} />
           <button className="bg-blue-600 text-white w-full py-2 rounded hover:bg-blue-700" onClick={signIn}>로그인</button>
         </div>
       ) : (
         <div className="max-w-6xl mx-auto">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             <div className="space-y-6">
-              {/* 3. 독서 저장 따로 */}
               <div className="bg-white/80 backdrop-blur p-4 rounded shadow">
                 <h2 className="font-bold mb-2">📚 오늘의 독서</h2>
                 <textarea className="w-full h-32 border p-2" value={reading} onChange={(e) => setReading(e.target.value)} />
                 <button className="w-full mt-2 bg-green-600 text-white py-1 rounded text-sm" onClick={saveReading}>독서 저장</button>
               </div>
-              {/* 3. 개발 저장 따로 */}
               <div className="bg-white/80 backdrop-blur p-4 rounded shadow">
                 <h2 className="font-bold mb-2">💻 오늘의 개발기록</h2>
                 <textarea className="w-full h-32 border p-2" value={dev} onChange={(e) => setDev(e.target.value)} />
@@ -159,14 +152,11 @@ export default function Home() {
 
             <div className="bg-white/80 backdrop-blur p-6 rounded shadow">
               <h2 className="text-center font-bold mb-4">{year}년 {month + 1}월</h2>
-              <div className="grid grid-cols-7 gap-1 text-center font-bold">
-                {['일', '월', '화', '수', '목', '금', '토'].map(d => <div key={d} className="py-1 text-xs text-gray-500">{d}</div>)}
+              <div className="grid grid-cols-7 gap-1 text-center font-bold text-xs text-gray-500">
+                {['일', '월', '화', '수', '목', '금', '토'].map(d => <div key={d}>{d}</div>)}
                 {days.map((d, i) => (
-                  <div 
-                    key={i} 
-                    onClick={() => d && setSelectedDate(`${year}-${String(month + 1).padStart(2,'0')}-${String(d).padStart(2,'0')}`)}
-                    className={`p-2 cursor-pointer rounded ${d && selectedDate.endsWith(`-${String(d).padStart(2,'0')}`) ? 'bg-blue-500 text-white' : 'hover:bg-blue-100'}`}
-                  >
+                  <div key={i} onClick={() => d && setSelectedDate(`${year}-${String(month + 1).padStart(2,'0')}-${String(d).padStart(2,'0')}`)}
+                    className={`p-2 cursor-pointer rounded ${d && selectedDate.endsWith(`-${String(d).padStart(2,'0')}`) ? 'bg-blue-500 text-white' : 'hover:bg-blue-100'}`}>
                     {d}
                   </div>
                 ))}
@@ -174,11 +164,32 @@ export default function Home() {
             </div>
 
             <div className="bg-white/80 backdrop-blur p-4 rounded shadow">
-              <h2 className="font-bold mb-2">✅ 투두</h2>
-              <ul className="space-y-2">
-                {todos.map(todo => <li key={todo.id} className="border-b pb-1">{todo.title}</li>)}
+              <h2 className="font-bold mb-4">✅ 투두 리스트</h2>
+              <ul className="space-y-3">
+                {todos.map(todo => (
+                  <li key={todo.id} className="flex items-center gap-3 p-1">
+                    {/* ✅ 체크박스 클릭 시 토글 함수 실행 */}
+                    <input 
+                      type="checkbox" 
+                      className="w-4 h-4 cursor-pointer" 
+                      checked={todo.is_done} 
+                      onChange={() => toggleTodo(todo.id, todo.is_done)} 
+                    />
+                    <span className={`${todo.is_done ? 'line-through text-gray-400' : 'text-gray-700 font-medium'}`}>
+                      {todo.title}
+                    </span>
+                  </li>
+                ))}
               </ul>
+              {todos.length === 0 && <p className="text-gray-400 text-sm text-center mt-4">항목이 없습니다.</p>}
             </div>
+          </div>
+          
+          {/* 배경화면 선택 버튼들 */}
+          <div className="mt-10 flex gap-4 justify-center">
+            {['/bg/bg1.jpg', '/bg/bg2.jpg', '/bg/bg3.jpg'].map((url, idx) => (
+              <button key={url} onClick={() => updateBackground(url)} className="w-10 h-10 rounded-full border-2 border-white shadow bg-gray-200" style={{ backgroundImage: `url(${url})`, backgroundSize: 'cover' }} />
+            ))}
           </div>
         </div>
       )}
