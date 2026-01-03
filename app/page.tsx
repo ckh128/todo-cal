@@ -23,7 +23,6 @@ export default function Home() {
   const [selectedDate, setSelectedDate] = useState(formatDate(today));
 
   const [todos, setTodos] = useState<Todo[]>([]);
-  const [newTitle, setNewTitle] = useState('');
   const [reading, setReading] = useState('');
   const [dev, setDev] = useState('');
 
@@ -77,40 +76,70 @@ export default function Home() {
     if (todoData) setTodos(todoData);
   };
 
-  // ✅ 추가된 기능: 투두 완료 토글 함수
   const toggleTodo = async (id: string, currentStatus: boolean) => {
-    const { error } = await supabase
-      .from('todos')
-      .update({ is_done: !currentStatus })
-      .eq('id', id);
-    
-    if (error) {
-      alert('상태 업데이트 실패');
-    } else {
-      loadTodos(); // 목록 새로고침
-    }
+    await supabase.from('todos').update({ is_done: !currentStatus }).eq('id', id);
+    loadTodos();
   };
 
   const loadDailyNote = async () => {
     const { data: userData } = await supabase.auth.getUser();
     if (!userData.user) return;
-    const { data: note } = await supabase.from('daily_notes').select('*').eq('user_id', userData.user.id).eq('date', selectedDate).single();
-    setReading(note?.reading ?? '');
-    setDev(note?.dev ?? '');
+    const { data: note, error } = await supabase
+      .from('daily_notes')
+      .select('*')
+      .eq('user_id', userData.user.id)
+      .eq('date', selectedDate)
+      .maybeSingle(); // 에러 방지를 위해 single 대신 maybeSingle 사용
+
+    if (note) {
+      setReading(note.reading ?? '');
+      setDev(note.dev ?? '');
+    } else {
+      setReading('');
+      setDev('');
+    }
   };
 
+  // ✅ 독서 저장 기능 보완
   const saveReading = async () => {
     const { data: userData } = await supabase.auth.getUser();
     if (!userData.user) return;
-    await supabase.from('daily_notes').upsert({ user_id: userData.user.id, date: selectedDate, reading: reading });
-    alert('독서 기록 저장 완료');
+
+    const { error } = await supabase.from('daily_notes').upsert({ 
+      user_id: userData.user.id, 
+      date: selectedDate, 
+      reading: reading,
+      // dev 값이 누락되면 기존 값이 지워질 수 있으므로 현재 상태의 dev를 같이 보냄
+      dev: dev 
+    }, { onConflict: 'user_id, date' });
+
+    if (error) {
+      console.error(error);
+      alert('독서 저장 실패: ' + error.message);
+    } else {
+      alert('독서 기록 저장 완료');
+    }
   };
 
+  // ✅ 개발 저장 기능 보완
   const saveDev = async () => {
     const { data: userData } = await supabase.auth.getUser();
     if (!userData.user) return;
-    await supabase.from('daily_notes').upsert({ user_id: userData.user.id, date: selectedDate, dev: dev });
-    alert('개발 기록 저장 완료');
+
+    const { error } = await supabase.from('daily_notes').upsert({ 
+      user_id: userData.user.id, 
+      date: selectedDate, 
+      dev: dev,
+      // reading 값이 누락되면 기존 값이 지워질 수 있으므로 현재 상태의 reading을 같이 보냄
+      reading: reading 
+    }, { onConflict: 'user_id, date' });
+
+    if (error) {
+      console.error(error);
+      alert('개발 저장 실패: ' + error.message);
+    } else {
+      alert('개발 기록 저장 완료');
+    }
   };
 
   useEffect(() => {
@@ -156,11 +185,12 @@ export default function Home() {
                 {['일', '월', '화', '수', '목', '금', '토'].map(d => <div key={d}>{d}</div>)}
                 {days.map((d, i) => (
                   <div key={i} onClick={() => d && setSelectedDate(`${year}-${String(month + 1).padStart(2,'0')}-${String(d).padStart(2,'0')}`)}
-                    className={`p-2 cursor-pointer rounded ${d && selectedDate.endsWith(`-${String(d).padStart(2,'0')}`) ? 'bg-blue-500 text-white' : 'hover:bg-blue-100'}`}>
+                    className={`p-2 cursor-pointer rounded ${d && selectedDate === `${year}-${String(month + 1).padStart(2,'0')}-${String(d).padStart(2,'0')}` ? 'bg-blue-500 text-white' : 'hover:bg-blue-100'}`}>
                     {d}
                   </div>
                 ))}
               </div>
+              <p className="mt-4 text-center text-sm font-bold text-blue-600">선택된 날짜: {selectedDate}</p>
             </div>
 
             <div className="bg-white/80 backdrop-blur p-4 rounded shadow">
@@ -168,28 +198,12 @@ export default function Home() {
               <ul className="space-y-3">
                 {todos.map(todo => (
                   <li key={todo.id} className="flex items-center gap-3 p-1">
-                    {/* ✅ 체크박스 클릭 시 토글 함수 실행 */}
-                    <input 
-                      type="checkbox" 
-                      className="w-4 h-4 cursor-pointer" 
-                      checked={todo.is_done} 
-                      onChange={() => toggleTodo(todo.id, todo.is_done)} 
-                    />
-                    <span className={`${todo.is_done ? 'line-through text-gray-400' : 'text-gray-700 font-medium'}`}>
-                      {todo.title}
-                    </span>
+                    <input type="checkbox" className="w-4 h-4 cursor-pointer" checked={todo.is_done} onChange={() => toggleTodo(todo.id, todo.is_done)} />
+                    <span className={`${todo.is_done ? 'line-through text-gray-400' : 'text-gray-700 font-medium'}`}>{todo.title}</span>
                   </li>
                 ))}
               </ul>
-              {todos.length === 0 && <p className="text-gray-400 text-sm text-center mt-4">항목이 없습니다.</p>}
             </div>
-          </div>
-          
-          {/* 배경화면 선택 버튼들 */}
-          <div className="mt-10 flex gap-4 justify-center">
-            {['/bg/bg1.jpg', '/bg/bg2.jpg', '/bg/bg3.jpg'].map((url, idx) => (
-              <button key={url} onClick={() => updateBackground(url)} className="w-10 h-10 rounded-full border-2 border-white shadow bg-gray-200" style={{ backgroundImage: `url(${url})`, backgroundSize: 'cover' }} />
-            ))}
           </div>
         </div>
       )}
