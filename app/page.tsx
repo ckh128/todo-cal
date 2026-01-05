@@ -221,7 +221,7 @@ export default function Home() {
             </div>
 
             {/* 중앙 섹션: 달력 */}
-            <div className="bg-white/40 backdrop-blur p-6 rounded-2xl shadow-lg border border-white/20">
+            <div className="bg-white/20 backdrop-blur p-6 rounded-2xl shadow-lg border border-white/20">
               <div className="flex justify-between items-center mb-6">
                 <button className="p-2 hover:bg-white rounded-full transition" onClick={() => setMonth(m => m === 0 ? 11 : m - 1)}>◀</button>
                 <h2 className="font-bold text-xl">{year}년 {month + 1}월</h2>
